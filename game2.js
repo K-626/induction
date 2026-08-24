@@ -39,10 +39,46 @@ function saveBestTime(depth, timeInSec) {
     const cur = getBestTime(depth);
     if (cur === null || timeInSec < cur) {
       localStorage.setItem(`kinou_best_d${depth}`, String(timeInSec));
-      return true; // 新記録達成
+      return true;
     }
   } catch (e) {}
   return false;
+}
+
+// ── Puzzle Code Sharing Utility ──────────────────────────────
+
+function encodePuzzleCode(sol) {
+  try {
+    const json = JSON.stringify(sol);
+    return btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  } catch (e) {
+    return '';
+  }
+}
+
+function decodePuzzleCode(codeStr) {
+  try {
+    let base64 = codeStr.trim().replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4 !== 0) base64 += '=';
+    const json = decodeURIComponent(escape(atob(base64)));
+    const sol = JSON.parse(json);
+    if (Array.isArray(sol) && sol.length >= 2 && sol.length <= 5) {
+      return sol;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function buildPuzzleFromSol(sol) {
+  let seq = [...BASE_SEQ];
+  for (const op of sol) {
+    seq = applyFwd(seq, op);
+    if (!isValidFwdSeq(seq)) return null;
+  }
+  return { puzzle: seq, sol };
 }
 
 // ── Utilities ────────────────────────────────────────────────
@@ -78,6 +114,15 @@ function fmt(x) {
 function invFact(v) {
   const i = FACT_TABLE.indexOf(v);
   return i >= 0 ? i : null;
+}
+
+function calcDiffSeq(seq) {
+  if (!seq || seq.length < 2) return null;
+  const diffs = [];
+  for (let i = 0; i < seq.length - 1; i++) {
+    diffs.push(snap(seq[i + 1] - seq[i]));
+  }
+  return diffs;
 }
 
 function evalOpnd(opnd, index) {
@@ -136,7 +181,6 @@ function shuffled(arr) {
   return a;
 }
 
-/** 階乗操作（n! または 単独F）であるかの判定 */
 function isFactOp(op) {
   if (!op) return false;
   if (op.type === 'F') return true;
@@ -217,7 +261,7 @@ function fwdCandidates(seq) {
   return ops;
 }
 
-// ── Puzzle generation (階乗使用は最大2回までの裏制約付き) ─────────
+// ── Puzzle generation ────────────────────────────────────────
 
 function genPuzzle(depth) {
   const SPECIAL = new Set(['P', 'E', 'F']);
@@ -231,7 +275,6 @@ function genPuzzle(depth) {
       let pool = fwdCandidates(seq);
       if (pool.length === 0) break;
 
-      // 💡 裏制約: 階乗操作は1つのパズルにつき最大2回まで！
       const factCount = ops.filter(isFactOp).length;
       if (factCount >= 2) {
         pool = pool.filter(op => !isFactOp(op));
@@ -354,6 +397,8 @@ const G = {
   timerId:     null,
   taFailed:    false,
   isNewRecord: false,
+  showDiff:    false,
+  isCustomCode:false, // コード指定プレイか否か
 };
 
 function stopTimer() {
@@ -377,13 +422,14 @@ function startTimer() {
 
 function startNewSession(mode, depth) {
   stopTimer();
-  G.mode        = mode;
-  G.depth       = depth;
-  G.solvedCount = 0;
-  G.timeElapsed = 0;
-  G.lastLapTime = 0;
-  G.taFailed    = false;
-  G.isNewRecord = false;
+  G.mode         = mode;
+  G.depth        = depth;
+  G.solvedCount  = 0;
+  G.timeElapsed  = 0;
+  G.lastLapTime  = 0;
+  G.taFailed     = false;
+  G.isNewRecord  = false;
+  G.isCustomCode = false;
 
   if (G.mode === 'timeattack') {
     startTimer();
@@ -392,8 +438,42 @@ function startNewSession(mode, depth) {
   nextPuzzle();
 }
 
+/** 共有コードからパズルセッションを開始 */
+function startCustomPuzzle(codeStr) {
+  const sol = decodePuzzleCode(codeStr);
+  if (!sol) {
+    alert('❌ 無効な問題コードです。正しいコードを入力してください。');
+    return;
+  }
+  const built = buildPuzzleFromSol(sol);
+  if (!built) {
+    alert('❌ 問題の復元に失敗しました。');
+    return;
+  }
+
+  stopTimer();
+  G.scr          = 'game';
+  G.mode         = 'endless';
+  G.depth        = sol.length;
+  G.puzzle       = built.puzzle;
+  G.sol          = built.sol;
+  G.ops          = Array(G.depth).fill(null);
+  G.seqs         = [built.puzzle, ...Array(G.depth).fill(null)];
+  G.slot         = 0;
+  G.kb           = 'idle';
+  G.arithOp      = null;
+  G.arithConst   = null;
+  G.errs         = Array(G.depth).fill(false);
+  G.cleared      = false;
+  G.showDiff     = false;
+  G.isCustomCode = true;
+  G.solvedCount  = 0;
+  render();
+}
+
 function nextPuzzle() {
   G.scr        = 'game';
+  G.isCustomCode = false;
   const { puzzle, sol } = genPuzzle(G.depth);
   G.puzzle     = puzzle;
   G.sol        = sol;
@@ -405,6 +485,7 @@ function nextPuzzle() {
   G.arithConst = null;
   G.errs       = Array(G.depth).fill(false);
   G.cleared    = false;
+  G.showDiff   = false;
   G.lapStart   = G.timeElapsed;
   render();
 }
@@ -622,6 +703,24 @@ function showHint() {
   }
 }
 
+/** 💡 現在の問題コードをコピー */
+function copyPuzzleCode() {
+  const code = encodePuzzleCode(G.sol);
+  if (!code) return;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      alert(`📋 問題コードをコピーしました！\n\n【コード】 ${code}`);
+    }).catch(() => promptCopy(code));
+  } else {
+    promptCopy(code);
+  }
+}
+
+function promptCopy(code) {
+  prompt('📋 問題コードをコピーしてください:', code);
+}
+
 // ── Rendering ────────────────────────────────────────────────
 
 function render() {
@@ -701,6 +800,15 @@ function htmlStart() {
     <button class="play-btn" onclick="startNewSession(G.mode, G.depth)">
       ゲームスタート！
     </button>
+
+    <!-- 🔗 問題共有コード入力セクション -->
+    <div class="share-code-section">
+      <div class="section-label" style="margin-bottom:6px">📥 問題コードを入力して挑戦</div>
+      <div class="share-input-row">
+        <input type="text" id="shareCodeInput" class="share-input" placeholder="共有コードを貼り付け..." />
+        <button class="share-play-btn" onclick="startCustomPuzzle(document.getElementById('shareCodeInput').value)">挑戦！</button>
+      </div>
+    </div>
   </div>
 </div>`;
 }
@@ -717,7 +825,13 @@ function htmlGame() {
 </div>`;
 
   const rows = [];
-  rows.push(htmlSeqRow(G.puzzle, '出題', 'puzzle-row', 'puzzle-chip'));
+  
+  rows.push(htmlPuzzleRow(G.puzzle));
+
+  if (G.showDiff) {
+    const diffs = calcDiffSeq(G.puzzle);
+    rows.push(htmlDiffRow(diffs));
+  }
 
   for (let s = 0; s < G.depth; s++) {
     const hasInput = !!G.seqs[s];
@@ -749,7 +863,8 @@ function htmlGame() {
       <span class="clear-badge">正解！ 🎉${lapInfo}</span>
       <span class="clear-desc">${descText}</span>
     </div>
-    ${!isTaDone ? `<button class="next-btn" onclick="nextPuzzle()">次の問題へ →</button>` : ''}
+    ${!isTaDone && !G.isCustomCode ? `<button class="next-btn" onclick="nextPuzzle()">次の問題へ →</button>` : ''}
+    ${G.isCustomCode ? `<button class="next-btn" onclick="G.scr='start';render()">← メニューへ</button>` : ''}
   </div>
 </div>`;
   }
@@ -765,6 +880,8 @@ function htmlGame() {
   <span class="best-header-chip" title="深度${G.depth}の自己ベスト">🏆 ${bestStr}</span>
   <span>問: <strong>${G.solvedCount} / ${targetQ}</strong></span>
 </div>`;
+  } else if (G.isCustomCode) {
+    headerMeta = `<div class="game-info">🎯 <strong>共有問題プレイ中</strong></div>`;
   } else {
     headerMeta = `<div class="game-info">クリア数: <strong>${G.solvedCount}</strong> 問</div>`;
   }
@@ -776,7 +893,10 @@ function htmlGame() {
   <div class="game-header">
     <button class="back-btn" onclick="stopTimer();G.scr='start';render()">← メニュー</button>
     ${headerMeta}
-    <button class="hint-btn${G.mode === 'timeattack' ? ' ta-hint-btn' : ''}" onclick="showHint()" title="${hintBtnTitle}">💡</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="share-copy-btn" onclick="copyPuzzleCode()" title="この問題をコードで共有">🔗 共有</button>
+      <button class="hint-btn${G.mode === 'timeattack' ? ' ta-hint-btn' : ''}" onclick="showHint()" title="${hintBtnTitle}">💡</button>
+    </div>
   </div>
 
   ${clearBanner}
@@ -788,6 +908,35 @@ function htmlGame() {
 
   <div class="keyboard">
     ${htmlKeyboard()}
+  </div>
+</div>`;
+}
+
+function htmlPuzzleRow(puzzle) {
+  const chips = puzzle.map((v, i) => `<span class="chip puzzle-chip" title="n=${i+1}">${fmt(v)}</span>`).join('');
+  const diffBtnText = G.showDiff ? '📊 階差を隠す' : '📊 階差';
+
+  return `
+<div class="seq-row puzzle-row">
+  <div class="row-label puzzle-lbl-wrap">
+    <span>出題</span>
+    <button class="diff-toggle-btn${G.showDiff ? ' active' : ''}" onclick="G.showDiff=!G.showDiff;render()">${diffBtnText}</button>
+  </div>
+  <div class="chips-wrap">
+    <div class="chips">${chips}</div>
+  </div>
+</div>`;
+}
+
+function htmlDiffRow(diffs) {
+  if (!diffs) return '';
+  const chips = diffs.map((v, i) => `<span class="chip diff-chip" title="b_${i+1}=a_${i+2}-a_${i+1}">${fmt(v)}</span>`).join('');
+
+  return `
+<div class="seq-row diff-row fade-in">
+  <div class="row-label diff-lbl">階差 bₙ</div>
+  <div class="chips-wrap">
+    <div class="chips diff-chips">${chips}</div>
   </div>
 </div>`;
 }
@@ -1025,4 +1174,13 @@ function htmlKeyboard() {
 </div>`;
 }
 
-window.addEventListener('DOMContentLoaded', render);
+// 💡 URLの ?code= パラメータを自動読み込み
+window.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const codeParam = urlParams.get('code');
+  if (codeParam) {
+    startCustomPuzzle(codeParam);
+  } else {
+    render();
+  }
+});
