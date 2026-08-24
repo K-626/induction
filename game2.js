@@ -13,6 +13,28 @@ const TA_TARGET_QUESTIONS = 5; // タイムアタック全5問
 // Precomputed factorials 0! .. 12!
 const FACT_TABLE = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600];
 
+// ── LocalStorage Best Time Management ────────────────────────
+
+function getBestTime(depth) {
+  try {
+    const v = localStorage.getItem(`kinou_best_d${depth}`);
+    return v !== null ? parseInt(v, 10) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveBestTime(depth, timeInSec) {
+  try {
+    const cur = getBestTime(depth);
+    if (cur === null || timeInSec < cur) {
+      localStorage.setItem(`kinou_best_d${depth}`, String(timeInSec));
+      return true; // 新記録達成
+    }
+  } catch (e) {}
+  return false;
+}
+
 // ── Utilities ────────────────────────────────────────────────
 
 function snap(x) {
@@ -303,6 +325,7 @@ const G = {
   lastLapTime: 0,
   timerId:     null,
   taFailed:    false,
+  isNewRecord: false, // 新記録フラグ
 };
 
 function stopTimer() {
@@ -332,6 +355,7 @@ function startNewSession(mode, depth) {
   G.timeElapsed = 0;
   G.lastLapTime = 0;
   G.taFailed    = false;
+  G.isNewRecord = false;
 
   if (G.mode === 'timeattack') {
     startTimer();
@@ -421,6 +445,9 @@ function applyAndCommit(op) {
 
     if (G.mode === 'timeattack' && G.solvedCount >= TA_TARGET_QUESTIONS) {
       stopTimer();
+      // 🏆 自己ベスト記録判定
+      G.isNewRecord = saveBestTime(G.depth, G.timeElapsed);
+
       setTimeout(() => {
         G.taFailed = false;
         G.scr = 'result';
@@ -526,6 +553,7 @@ function handleKb(key) {
 }
 
 function fmtTime(sec) {
+  if (sec === null || sec === undefined) return '−−:−−';
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
@@ -554,9 +582,8 @@ function showHint() {
   }).join('\n');
 
   if (G.mode === 'timeattack') {
-    // 💡 タイムアタック時の確認ダイアログ
     const ok = confirm('⚠️ タイムアタック失敗となりますが、本当に答えを見ますか？');
-    if (!ok) return; // キャンセルした場合はそのままゲームを継続
+    if (!ok) return;
 
     stopTimer();
     G.taFailed = true;
@@ -587,6 +614,9 @@ function htmlStart() {
     4: 'むずかしい (4段)',
     5: 'エキスパート (5段)',
   };
+
+  const bestSec = getBestTime(G.depth);
+  const bestText = fmtTime(bestSec);
 
   return `
 <div class="screen start-scr">
@@ -632,6 +662,11 @@ function htmlStart() {
       </div>
       <div style="text-align:center;font-size:0.85rem;color:var(--navy-soft);margin-top:8px;font-weight:bold">
         ${depthDescs[G.depth]}
+      </div>
+      <!-- 🏆 各段の自己ベストタイム表示 -->
+      <div class="best-time-banner">
+        <span class="best-time-lbl">🏆 深度 ${G.depth} の自己ベスト:</span>
+        <span class="best-time-val">${bestText}</span>
       </div>
     </div>
 
@@ -689,11 +724,15 @@ function htmlGame() {
 </div>`;
   }
 
+  const bestSec = getBestTime(G.depth);
+  const bestStr = bestSec !== null ? fmtTime(bestSec) : '−−:−−';
+
   let headerMeta;
   if (G.mode === 'timeattack') {
     headerMeta = `
 <div class="game-info timeattack-info">
   <span class="timer-chip">⏱️ <span id="headerTimer">${fmtTime(G.timeElapsed)}</span></span>
+  <span class="best-header-chip" title="深度${G.depth}の自己ベスト">🏆 ${bestStr}</span>
   <span>問: <strong>${G.solvedCount} / ${TA_TARGET_QUESTIONS}</strong></span>
 </div>`;
   } else {
@@ -775,12 +814,14 @@ function htmlResult() {
   }
 
   const avgTime = G.solvedCount > 0 ? (G.timeElapsed / G.solvedCount).toFixed(1) : '0.0';
+  const newRecBadge = G.isNewRecord ? `<div class="new-record-badge">🎉 自己ベスト達成！</div>` : '';
 
   return `
 <div class="screen win-scr">
   <div class="result-title-card">
     <div class="timeup-stamp">🏆 TIME ATTACK!</div>
     <p class="win-sub">5問タイムアタック達成！（深度 ${G.depth}）</p>
+    ${newRecBadge}
   </div>
 
   <div class="win-ops-card">
