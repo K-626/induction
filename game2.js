@@ -8,7 +8,17 @@
 const NUM_TERMS = 10;
 const BASE_SEQ  = Array.from({ length: NUM_TERMS }, (_, i) => i + 1); // [1..10]
 const MAX_VAL   = 1e9;
-const TA_TARGET_QUESTIONS = 5; // タイムアタック全5問
+
+/** 深度ごとのタイムアタック目標問題数 */
+function getTargetQuestions(depth) {
+  switch (depth) {
+    case 2: return 5;
+    case 3: return 3;
+    case 4: return 1;
+    case 5: return 1;
+    default: return 5;
+  }
+}
 
 // Precomputed factorials 0! .. 12!
 const FACT_TABLE = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600];
@@ -126,6 +136,17 @@ function shuffled(arr) {
   return a;
 }
 
+/** 階乗操作（n! または 単独F）であるかの判定 */
+function isFactOp(op) {
+  if (!op) return false;
+  if (op.type === 'F') return true;
+  if (op.type === 'A') {
+    if (op.c === 'n!') return true;
+    if (typeof op.c === 'object' && op.c.v === 'n!') return true;
+  }
+  return false;
+}
+
 // ── Forward operations ───────────────────────────────────────
 
 function applyFwd(seq, op) {
@@ -196,7 +217,7 @@ function fwdCandidates(seq) {
   return ops;
 }
 
-// ── Puzzle generation ────────────────────────────────────────
+// ── Puzzle generation (階乗使用は最大2回までの裏制約付き) ─────────
 
 function genPuzzle(depth) {
   const SPECIAL = new Set(['P', 'E', 'F']);
@@ -208,6 +229,13 @@ function genPuzzle(depth) {
 
     for (let d = 0; d < depth; d++) {
       let pool = fwdCandidates(seq);
+      if (pool.length === 0) break;
+
+      // 💡 裏制約: 階乗操作は1つのパズルにつき最大2回まで！
+      const factCount = ops.filter(isFactOp).length;
+      if (factCount >= 2) {
+        pool = pool.filter(op => !isFactOp(op));
+      }
       if (pool.length === 0) break;
 
       if (!hasSpecial && attempt < 500 && d < depth - 1) {
@@ -325,7 +353,7 @@ const G = {
   lastLapTime: 0,
   timerId:     null,
   taFailed:    false,
-  isNewRecord: false, // 新記録フラグ
+  isNewRecord: false,
 };
 
 function stopTimer() {
@@ -443,9 +471,9 @@ function applyAndCommit(op) {
     G.solvedCount++;
     G.lastLapTime = G.timeElapsed - G.lapStart;
 
-    if (G.mode === 'timeattack' && G.solvedCount >= TA_TARGET_QUESTIONS) {
+    const targetQ = getTargetQuestions(G.depth);
+    if (G.mode === 'timeattack' && G.solvedCount >= targetQ) {
       stopTimer();
-      // 🏆 自己ベスト記録判定
       G.isNewRecord = saveBestTime(G.depth, G.timeElapsed);
 
       setTimeout(() => {
@@ -617,6 +645,7 @@ function htmlStart() {
 
   const bestSec = getBestTime(G.depth);
   const bestText = fmtTime(bestSec);
+  const taTarget = getTargetQuestions(G.depth);
 
   return `
 <div class="screen start-scr">
@@ -645,7 +674,7 @@ function htmlStart() {
         >
           <span class="m-icon">⏱️</span>
           <span class="m-title">タイムアタック</span>
-          <span class="m-desc">全5問のクリアタイムを競う！</span>
+          <span class="m-desc">全 ${taTarget} 問のタイムを競う！</span>
         </button>
       </div>
     </div>
@@ -661,9 +690,8 @@ function htmlStart() {
         `).join('')}
       </div>
       <div style="text-align:center;font-size:0.85rem;color:var(--navy-soft);margin-top:8px;font-weight:bold">
-        ${depthDescs[G.depth]}
+        ${depthDescs[G.depth]} ${G.mode === 'timeattack' ? `(全 ${taTarget} 問)` : ''}
       </div>
-      <!-- 🏆 各段の自己ベストタイム表示 -->
       <div class="best-time-banner">
         <span class="best-time-lbl">🏆 深度 ${G.depth} の自己ベスト:</span>
         <span class="best-time-val">${bestText}</span>
@@ -706,11 +734,13 @@ function htmlGame() {
     rows.push(htmlSeqRow(rowSeq, rowLabel, rowClass, chipClass));
   }
 
+  const targetQ = getTargetQuestions(G.depth);
+
   let clearBanner = '';
   if (G.cleared) {
-    const isTaDone = G.mode === 'timeattack' && G.solvedCount >= TA_TARGET_QUESTIONS;
+    const isTaDone = G.mode === 'timeattack' && G.solvedCount >= targetQ;
     const lapInfo  = G.mode === 'timeattack' ? ` (ラップ: ${G.lastLapTime}秒)` : '';
-    const descText = isTaDone ? '全5問クリア！リザルトへ移動中…' : `全 ${G.solvedCount} 問クリア`;
+    const descText = isTaDone ? `全${targetQ}問クリア！リザルトへ移動中…` : `全 ${G.solvedCount} 問クリア`;
 
     clearBanner = `
 <div class="clear-banner fade-in">
@@ -733,7 +763,7 @@ function htmlGame() {
 <div class="game-info timeattack-info">
   <span class="timer-chip">⏱️ <span id="headerTimer">${fmtTime(G.timeElapsed)}</span></span>
   <span class="best-header-chip" title="深度${G.depth}の自己ベスト">🏆 ${bestStr}</span>
-  <span>問: <strong>${G.solvedCount} / ${TA_TARGET_QUESTIONS}</strong></span>
+  <span>問: <strong>${G.solvedCount} / ${targetQ}</strong></span>
 </div>`;
   } else {
     headerMeta = `<div class="game-info">クリア数: <strong>${G.solvedCount}</strong> 問</div>`;
@@ -763,6 +793,8 @@ function htmlGame() {
 }
 
 function htmlResult() {
+  const targetQ = getTargetQuestions(G.depth);
+
   if (G.taFailed) {
     const revOps = G.sol.slice().reverse();
     const solLines = revOps.map((op, i) => {
@@ -793,7 +825,7 @@ function htmlResult() {
       </div>
       <div class="res-item">
         <div class="res-lbl">正解していた問題数</div>
-        <div class="res-val">${G.solvedCount} / 5 <span class="res-unit">問</span></div>
+        <div class="res-val">${G.solvedCount} / ${targetQ} <span class="res-unit">問</span></div>
       </div>
     </div>
     <div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--navy-soft);font-size:0.85rem;text-align:left">
@@ -820,7 +852,7 @@ function htmlResult() {
 <div class="screen win-scr">
   <div class="result-title-card">
     <div class="timeup-stamp">🏆 TIME ATTACK!</div>
-    <p class="win-sub">5問タイムアタック達成！（深度 ${G.depth}）</p>
+    <p class="win-sub">${targetQ}問タイムアタック達成！（深度 ${G.depth}）</p>
     ${newRecBadge}
   </div>
 
@@ -832,7 +864,7 @@ function htmlResult() {
       </div>
       <div class="res-item">
         <div class="res-lbl">達成問題数</div>
-        <div class="res-val">5 / 5 <span class="res-unit">問</span></div>
+        <div class="res-val">${targetQ} / ${targetQ} <span class="res-unit">問</span></div>
       </div>
       <div class="res-item">
         <div class="res-lbl">平均クリアタイム</div>
