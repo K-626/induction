@@ -49,7 +49,7 @@ function invFact(v) {
 }
 
 function evalOpnd(opnd, index) {
-  const n = index + 1;
+  const n = index + 1; // 1-indexed
   if (opnd === null || opnd === undefined) return null;
   if (typeof opnd === 'number') return opnd;
   if (typeof opnd === 'string') {
@@ -284,8 +284,8 @@ function revLabel(op) {
 // ── Game state ───────────────────────────────────────────────
 
 const G = {
-  scr:         'start', // 'start' | 'game' | 'result'
-  mode:        'endless', // 'endless' | 'timeattack'
+  scr:         'start',
+  mode:        'endless',
   depth:       3,
   puzzle:      [],
   sol:         [],
@@ -302,7 +302,7 @@ const G = {
   lapStart:    0,
   lastLapTime: 0,
   timerId:     null,
-  taFailed:    false, // タイムアタック失敗フラグ
+  taFailed:    false,
 };
 
 function stopTimer() {
@@ -390,7 +390,7 @@ function triggerError(s) {
   setTimeout(() => { G.errs[s] = false; render(); }, 700);
 }
 
-function tryApply(op, silent = false) {
+function applyAndCommit(op) {
   const s = G.slot;
   if (s === null || !G.seqs[s]) return false;
 
@@ -398,7 +398,7 @@ function tryApply(op, silent = false) {
   const result    = rawResult.map(snap);
 
   if (!isAllNat(result)) {
-    if (!silent) triggerError(s);
+    triggerError(s);
     return false;
   }
 
@@ -440,6 +440,21 @@ function tryApply(op, silent = false) {
   return true;
 }
 
+function previewCalc(op) {
+  const s = G.slot;
+  if (s === null || !G.seqs[s]) return;
+
+  const rawResult = applyRev(G.seqs[s], op);
+  const result    = rawResult.map(snap);
+
+  if (isAllNat(result)) {
+    G.seqs[s + 1] = result;
+  } else {
+    G.seqs[s + 1] = null;
+  }
+  render();
+}
+
 function handleKb(key) {
   const s = G.slot;
   if (s === null) return;
@@ -449,17 +464,34 @@ function handleKb(key) {
     return;
   }
 
+  if (key === 'commit') {
+    if (G.kb === 'arith' && G.arithOp && G.arithConst !== null) {
+      applyAndCommit({ type: 'A', o: G.arithOp, c: G.arithConst });
+    }
+    return;
+  }
+
   if (!G.seqs[s]) return;
 
-  if (key === 'IF')  { tryApply({ type:'IF' });          return; }
-  if (key === 'R2')  { tryApply({ type:'R', n:2 });      return; }
-  if (key === 'R3')  { tryApply({ type:'R', n:3 });      return; }
-  if (key === 'R4')  { tryApply({ type:'R', n:4 });      return; }
-  if (key === 'L2')  { tryApply({ type:'L', b:2 });      return; }
-  if (key === 'L3')  { tryApply({ type:'L', b:3 });      return; }
-  if (key === 'L4')  { tryApply({ type:'L', b:4 });      return; }
+  if (['IF', 'R2', 'R3', 'R4', 'L2', 'L3', 'L4'].includes(key)) {
+    const specOp = {
+      'IF': { type: 'IF' },
+      'R2': { type: 'R', n: 2 },
+      'R3': { type: 'R', n: 3 },
+      'R4': { type: 'R', n: 4 },
+      'L2': { type: 'L', b: 2 },
+      'L3': { type: 'L', b: 3 },
+      'L4': { type: 'L', b: 4 },
+    }[key];
+    applyAndCommit(specOp);
+    return;
+  }
 
   if (['+', '-', '*', '/'].includes(key)) {
+    if (G.kb === 'arith' && G.arithOp && G.arithConst !== null) {
+      applyAndCommit({ type: 'A', o: G.arithOp, c: G.arithConst });
+    }
+
     if (G.kb === 'arith' && G.arithOp === key && G.arithConst === null) {
       G.kb = 'idle'; G.arithOp = null; G.arithConst = null;
     } else {
@@ -469,25 +501,26 @@ function handleKb(key) {
   }
 
   if (G.kb === 'arith' && G.arithOp) {
-    const num = typeof key === 'number' ? key : parseInt(key, 10);
-
-    if (!isNaN(num) && num >= 1 && num <= 9) {
-      G.arithConst = num;
-      const ok = tryApply({ type:'A', o: G.arithOp, c: num }, true);
-      if (!ok) {
-        render();
-      }
-      return;
-    }
-
-    if (['n', 'n2', 'n3', 'n4', '2n', '3n', '4n', 'n!'].includes(key)) {
+    if (typeof key === 'string' && ['n', 'n2', 'n3', 'n4', '2n', '3n', '4n', 'n!'].includes(key)) {
       let finalOpnd;
       if (G.arithConst !== null) {
         finalOpnd = { c: G.arithConst, v: key };
       } else {
         finalOpnd = key;
       }
-      tryApply({ type:'A', o: G.arithOp, c: finalOpnd }, false);
+      applyAndCommit({ type: 'A', o: G.arithOp, c: finalOpnd });
+      return;
+    }
+
+    const num = typeof key === 'number' ? key : (typeof key === 'string' && /^[1-9]$/.test(key) ? parseInt(key, 10) : NaN);
+    if (!isNaN(num) && num >= 1 && num <= 9) {
+      if (G.arithConst === num) {
+        applyAndCommit({ type: 'A', o: G.arithOp, c: num });
+        return;
+      }
+      G.arithConst = num;
+      previewCalc({ type: 'A', o: G.arithOp, c: num });
+      return;
     }
   }
 }
@@ -521,7 +554,10 @@ function showHint() {
   }).join('\n');
 
   if (G.mode === 'timeattack') {
-    // タイムアタック中はヒントを見たら即座に挑戦失敗！
+    // 💡 タイムアタック時の確認ダイアログ
+    const ok = confirm('⚠️ タイムアタック失敗となりますが、本当に答えを見ますか？');
+    if (!ok) return; // キャンセルした場合はそのままゲームを継続
+
     stopTimer();
     G.taFailed = true;
     G.scr = 'result';
@@ -846,7 +882,7 @@ function htmlKeyboard() {
   } else if (inArith) {
     const sym = {'+':'+', '-':'−', '*':'×', '/':'÷'}[G.arithOp];
     if (G.arithConst !== null) {
-      statusHtml = `演算子 <span class="op-sel-indicator">${sym} ${G.arithConst}</span> 選択中 → [ｎ], [ｎ²] を押して合成（例: ${G.arithConst}ｎ²）`;
+      statusHtml = `演算子 <span class="op-sel-indicator">${sym} ${G.arithConst}</span> → [確定] を押すか [ｎ], [ｎ²] と合成`;
     } else {
       statusHtml = `演算子 <span class="op-sel-indicator">${sym}</span> 選択中 → [1〜9], [ｎ], [2ⁿ] など対象を選択`;
     }
@@ -858,6 +894,7 @@ function htmlKeyboard() {
   }
 
   const dis = kbActive ? '' : ' disabled';
+  const okDis = kbActive && inArith && G.arithConst !== null ? '' : ' disabled';
 
   const arithBtns = [
     ['+', '+'], ['-', '−'], ['*', '×'], ['/', '÷']
@@ -891,6 +928,7 @@ function htmlKeyboard() {
     <div class="kb-row">
       ${arithBtns}
       <button class="kb-btn clr" onclick="handleKb('clear')"${dis}>消去</button>
+      <button class="kb-btn ok-btn" onclick="handleKb('commit')"${okDis}>確定</button>
     </div>
     
     <div class="kb-row">
