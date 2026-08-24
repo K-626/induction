@@ -81,12 +81,12 @@ function buildPuzzleFromSol(sol) {
   return { puzzle: seq, sol };
 }
 
-// ── Utilities ────────────────────────────────────────────────
+// ── Utilities (浮動小数点誤差の頑丈な吸収) ───────────────────────
 
 function snap(x) {
   if (x === null || x === undefined || !Number.isFinite(x)) return x;
   const r = Math.round(x);
-  return Math.abs(x - r) < 1e-9 ? r : x;
+  return Math.abs(x - r) < 1e-4 ? r : x;
 }
 
 function isNat(x) {
@@ -117,13 +117,14 @@ function fmt(x) {
   return v.toFixed(2);
 }
 
-/** 💡 逆階乗の計算 (1! = 1, 2! = 2, 3! = 6 ...) */
+/** 💡 逆階乗の計算 (丸め誤差吸収版: 1! = 1, 2! = 2, 3! = 6 ...) */
 function invFact(v) {
-  if (v === null || v === undefined || v < 1) return null;
-  const snapV = snap(v);
-  if (snapV === 1) return 1; // 1! = 1
+  if (v === null || v === undefined) return null;
+  const r = Math.round(v);
+  if (Math.abs(v - r) > 1e-4 || r < 1) return null;
+  if (r === 1) return 1;
   for (let i = 1; i <= 12; i++) {
-    if (FACT_TABLE[i] === snapV) return i;
+    if (FACT_TABLE[i] === r) return i;
   }
   return null;
 }
@@ -212,15 +213,15 @@ function applyFwd(seq, op) {
         const val = evalOpnd(op.c, i);
         if (val === null) return null;
         switch (op.o) {
-          case '+': return v + val;
-          case '-': return v - val;
-          case '*': return v * val;
-          case '/': return val !== 0 && v % val === 0 ? v / val : null;
+          case '+': return snap(v + val);
+          case '-': return snap(v - val);
+          case '*': return snap(v * val);
+          case '/': return val !== 0 && v % val === 0 ? snap(v / val) : null;
         }
         return null;
       }
-      case 'P': return Math.pow(v, op.e);
-      case 'E': return Math.pow(op.b, v);
+      case 'P': return snap(Math.pow(v, op.e));
+      case 'E': return snap(Math.pow(op.b, v));
       case 'F': return (Number.isInteger(v) && v >= 0 && v <= 12) ? FACT_TABLE[v] : null;
       default:  return null;
     }
@@ -356,10 +357,10 @@ function applyRev(seq, op) {
         if (val === null) return null;
         if ((op.o === '*' || op.o === '/') && val === 0) return null;
         switch (op.o) {
-          case '+': return v + val;
-          case '-': return v - val;
-          case '*': return v * val;
-          case '/': return v / val;
+          case '+': return snap(v + val);
+          case '-': return snap(v - val);
+          case '*': return snap(v * val);
+          case '/': return snap(v / val);
         }
         return null;
       }
@@ -987,7 +988,7 @@ function htmlResult() {
       </div>
       <div class="res-item">
         <div class="res-lbl">正解していた問題数</div>
-        <div class="res-val">${G.solvedCount} / ${targetQ} <span class="res-unit">問</span></div>
+        <div class="res-val">${G.solvedCount} / ${targetQ} <span class="res-unit">问</span></div>
       </div>
     </div>
     <div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--navy-soft);font-size:0.85rem;text-align:left">
