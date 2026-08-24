@@ -117,9 +117,15 @@ function fmt(x) {
   return v.toFixed(2);
 }
 
+/** 💡 逆階乗の計算 (1! = 1, 2! = 2, 3! = 6 ...) */
 function invFact(v) {
-  const i = FACT_TABLE.indexOf(v);
-  return i >= 0 ? i : null;
+  if (v === null || v === undefined || v < 1) return null;
+  const snapV = snap(v);
+  if (snapV === 1) return 1; // 1! = 1
+  for (let i = 1; i <= 12; i++) {
+    if (FACT_TABLE[i] === snapV) return i;
+  }
+  return null;
 }
 
 function calcDiffSeq(seq) {
@@ -552,7 +558,6 @@ function applyAndCommit(op) {
   G.arithOp    = null;
   G.arithConst = null;
 
-  // 💡 【修正】すべての操作が埋まり、かつ最下段の数列が「自然数列 n (1..10)」に完全一致している場合のみクリア！
   if (G.ops.every(o => o !== null) && isBaseSeq(G.seqs[G.depth])) {
     G.cleared = true;
     G.solvedCount++;
@@ -850,7 +855,6 @@ function htmlGame() {
     rows.push(htmlOpArrow(s, G.ops[s], isActive, isSet, hasErr, hasInput));
 
     const rowSeq   = G.seqs[s + 1];
-    // 💡 最下段のラベルに「目標: ｎ (1..10)」を明記
     const rowLabel = s === G.depth - 1 ? 'ゴール\n(ｎにする)' : `中間${s + 1}`;
     const rowClass = rowSeq ? 'fade-in' : 'dim-row';
     const chipClass = rowSeq ? (isBaseSeq(rowSeq) ? 'nat' : 'not-base-chip') : 'unknown';
