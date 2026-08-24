@@ -224,7 +224,6 @@ html, body {
   transform: translateY(-2px);
 }
 
-/* 🏆 自己ベストタイムバナー (スタート画面) */
 .best-time-banner {
   display: flex;
   align-items: center;
@@ -269,6 +268,72 @@ html, body {
 
 .play-btn:hover { filter: brightness(1.08); }
 .play-btn:active { transform: translateY(5px); box-shadow: none; }
+
+/* 🔗 問題共有コード入力エリア */
+.share-code-section {
+  padding-top: 12px;
+  border-top: 2px dashed var(--navy-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.share-input-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.share-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  border: 2px solid var(--navy);
+  border-radius: var(--radius-sm);
+  background: #FAFAFA;
+  outline: none;
+}
+
+.share-input:focus {
+  background: #fff;
+  border-color: var(--purple);
+}
+
+.share-play-btn {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 900;
+  background: var(--purple);
+  color: #fff;
+  border: 2px solid var(--navy);
+  border-radius: var(--radius-sm);
+  padding: 0 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow-pop-xs);
+  white-space: nowrap;
+}
+
+.share-play-btn:hover { filter: brightness(1.1); }
+.share-play-btn:active { transform: translateY(2px); box-shadow: none; }
+
+/* 🔗 ヘッダー用共有ボタン */
+.share-copy-btn {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: rgba(123, 92, 250, 0.25);
+  border: 2px solid var(--purple-light);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.share-copy-btn:hover {
+  background: var(--purple);
+}
 
 /* ══════════════════════════════════════════════════
    GAME SCREEN
@@ -435,6 +500,55 @@ html, body {
 
 .seq-row.puzzle-row {
   background: #F0F6FF;
+}
+
+.puzzle-lbl-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.diff-toggle-btn {
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 2px 6px;
+  background: #fff;
+  color: var(--purple);
+  border: 1.5px solid var(--purple);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.1s ease;
+}
+
+.diff-toggle-btn:hover { background: var(--purple-light); }
+
+.diff-toggle-btn.active {
+  background: var(--purple);
+  color: #fff;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.seq-row.diff-row {
+  background: #F8F5FF;
+  border-color: var(--purple);
+  border-style: dashed;
+  padding: 6px 12px;
+}
+
+.diff-lbl {
+  color: var(--purple);
+  font-weight: 900;
+  font-size: 0.76rem;
+}
+
+.chip.diff-chip {
+  background: var(--purple-light);
+  border-color: var(--purple);
+  color: var(--purple);
+  font-size: 0.88rem;
 }
 
 .seq-row.dim-row {
@@ -979,6 +1093,7 @@ html, body {
   .best-time-lbl { font-size: 0.78rem; }
   .best-time-val { font-size: 0.95rem; }
   .best-header-chip { font-size: 0.75rem; padding: 1px 6px; }
+  .share-copy-btn { font-size: 0.75rem; padding: 3px 8px; }
 }
 
 @media (max-width: 360px) {
