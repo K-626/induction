@@ -138,6 +138,17 @@ html, body {
   gap: 18px;
 }
 
+/* 🎯 ゲームの目的説明ボックス */
+.goal-explain-box {
+  background: var(--amber-light);
+  border: 2px solid var(--amber-deep);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.86rem;
+  color: var(--navy);
+  line-height: 1.4;
+}
+
 .section-label {
   font-family: var(--font-display);
   font-weight: 700;
@@ -269,7 +280,6 @@ html, body {
 .play-btn:hover { filter: brightness(1.08); }
 .play-btn:active { transform: translateY(5px); box-shadow: none; }
 
-/* 🔗 問題共有コード入力エリア */
 .share-code-section {
   padding-top: 12px;
   border-top: 2px dashed var(--navy-soft);
@@ -317,7 +327,6 @@ html, body {
 .share-play-btn:hover { filter: brightness(1.1); }
 .share-play-btn:active { transform: translateY(2px); box-shadow: none; }
 
-/* 🔗 ヘッダー用共有ボタン */
 .share-copy-btn {
   font-family: var(--font-display);
   font-size: 0.85rem;
@@ -331,9 +340,7 @@ html, body {
   white-space: nowrap;
 }
 
-.share-copy-btn:hover {
-  background: var(--purple);
-}
+.share-copy-btn:hover { background: var(--purple); }
 
 /* ══════════════════════════════════════════════════
    GAME SCREEN
@@ -605,10 +612,18 @@ html, body {
   flex-shrink: 0;
 }
 
+/* 🎯 自然数列 n (1..10) に完全一致したチップ (緑) */
 .chip.nat {
   background: var(--green-light);
   border-color: var(--green-deep);
   color: var(--green-deep);
+}
+
+/* ⚠️ 自然数だが n (1..10) ではない途中/最下段チップ (オレンジ) */
+.chip.not-base-chip {
+  background: var(--amber-light);
+  border-color: var(--amber-deep);
+  color: var(--navy);
 }
 
 .chip.puzzle-chip {
@@ -1094,6 +1109,7 @@ html, body {
   .best-time-val { font-size: 0.95rem; }
   .best-header-chip { font-size: 0.75rem; padding: 1px 6px; }
   .share-copy-btn { font-size: 0.75rem; padding: 3px 8px; }
+  .goal-explain-box { font-size: 0.78rem; padding: 8px 10px; }
 }
 
 @media (max-width: 360px) {
