@@ -224,6 +224,33 @@ html, body {
   transform: translateY(-2px);
 }
 
+/* 🏆 自己ベストタイムバナー (スタート画面) */
+.best-time-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--amber-light);
+  border: 2px solid var(--amber-deep);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  margin-top: 10px;
+}
+
+.best-time-lbl {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--navy-soft);
+}
+
+.best-time-val {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: var(--navy);
+}
+
 .play-btn {
   width: 100%;
   padding: 15px;
@@ -293,7 +320,7 @@ html, body {
 .timeattack-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .timer-chip {
@@ -302,9 +329,20 @@ html, body {
   font-weight: bold;
   background: rgba(255, 255, 255, 0.15);
   border: 1.5px solid rgba(255, 255, 255, 0.4);
-  padding: 2px 10px;
+  padding: 2px 8px;
   border-radius: 999px;
   color: var(--amber);
+  white-space: nowrap;
+}
+
+.best-header-chip {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  background: rgba(255, 217, 61, 0.15);
+  border: 1px solid rgba(255, 217, 61, 0.4);
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #FFE600;
   white-space: nowrap;
 }
 
@@ -704,7 +742,6 @@ html, body {
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
 }
 
-/* 確定ボタン (緑) */
 .kb-btn.ok-btn {
   background: var(--green-deep) !important;
   color: #fff !important;
@@ -713,9 +750,7 @@ html, body {
   padding: 0 14px;
 }
 
-.kb-btn.ok-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
+.kb-btn.ok-btn:hover:not(:disabled) { filter: brightness(1.1); }
 
 .n-btn {
   background: var(--purple-light) !important;
@@ -801,6 +836,19 @@ html, body {
   color: var(--red-deep);
   border-color: var(--red-deep);
   transform: rotate(-4deg);
+}
+
+.new-record-badge {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fff;
+  background: var(--amber-deep);
+  border: 2px solid var(--navy);
+  padding: 4px 14px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-pop-xs);
+  animation: pulse 1s ease-in-out infinite alternate;
 }
 
 .win-sub {
@@ -926,6 +974,11 @@ html, body {
   .kb-btn.fact { font-size: 0.78rem; flex: 1.2; }
   .kb-btn.clr { font-size: 0.82rem; flex: 1.1; }
   .kb-btn.ok-btn { font-size: 0.82rem; flex: 1.2; }
+
+  .best-time-banner { padding: 4px 10px; font-size: 0.78rem; }
+  .best-time-lbl { font-size: 0.78rem; }
+  .best-time-val { font-size: 0.95rem; }
+  .best-header-chip { font-size: 0.75rem; padding: 1px 6px; }
 }
 
 @media (max-width: 360px) {
