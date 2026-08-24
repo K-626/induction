@@ -6,7 +6,7 @@
 
 // ── Constants ───────────────────────────────────────────────
 const NUM_TERMS = 10;
-const BASE_SEQ  = Array.from({ length: NUM_TERMS }, (_, i) => i + 1); // [1..10]
+const BASE_SEQ  = Array.from({ length: NUM_TERMS }, (_, i) => i + 1); // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 const MAX_VAL   = 1e9;
 
 /** 深度ごとのタイムアタック目標問題数 */
@@ -96,6 +96,12 @@ function isNat(x) {
 
 function isAllNat(seq) {
   return Array.isArray(seq) && seq.length === NUM_TERMS && seq.every(isNat);
+}
+
+/** 最下段が元の自然数列 n (1, 2, 3... 10) に一致しているか判別 */
+function isBaseSeq(seq) {
+  if (!seq || seq.length !== NUM_TERMS) return false;
+  return seq.every((v, i) => snap(v) === BASE_SEQ[i]);
 }
 
 function fmt(x) {
@@ -398,7 +404,7 @@ const G = {
   taFailed:    false,
   isNewRecord: false,
   showDiff:    false,
-  isCustomCode:false, // コード指定プレイか否か
+  isCustomCode:false,
 };
 
 function stopTimer() {
@@ -438,7 +444,6 @@ function startNewSession(mode, depth) {
   nextPuzzle();
 }
 
-/** 共有コードからパズルセッションを開始 */
 function startCustomPuzzle(codeStr) {
   const sol = decodePuzzleCode(codeStr);
   if (!sol) {
@@ -547,7 +552,8 @@ function applyAndCommit(op) {
   G.arithOp    = null;
   G.arithConst = null;
 
-  if (G.ops.every(o => o !== null) && isAllNat(G.seqs[G.depth])) {
+  // 💡 【修正】すべての操作が埋まり、かつ最下段の数列が「自然数列 n (1..10)」に完全一致している場合のみクリア！
+  if (G.ops.every(o => o !== null) && isBaseSeq(G.seqs[G.depth])) {
     G.cleared = true;
     G.solvedCount++;
     G.lastLapTime = G.timeElapsed - G.lapStart;
@@ -703,7 +709,6 @@ function showHint() {
   }
 }
 
-/** 💡 現在の問題コードをコピー */
 function copyPuzzleCode() {
   const code = encodePuzzleCode(G.sol);
   if (!code) return;
@@ -756,6 +761,10 @@ function htmlStart() {
   </div>
 
   <div class="start-card">
+    <div class="goal-explain-box">
+      🎯 <strong>ゲームの目的:</strong> 数列に逆操作を重ね、最下段を<strong>元の自然数列 ｎ (1, 2, 3…10)</strong> に戻せばクリア！
+    </div>
+
     <div class="mode-section">
       <div class="section-label">🎮 モードを選択</div>
       <div class="mode-row">
@@ -801,7 +810,6 @@ function htmlStart() {
       ゲームスタート！
     </button>
 
-    <!-- 🔗 問題共有コード入力セクション -->
     <div class="share-code-section">
       <div class="section-label" style="margin-bottom:6px">📥 問題コードを入力して挑戦</div>
       <div class="share-input-row">
@@ -842,9 +850,10 @@ function htmlGame() {
     rows.push(htmlOpArrow(s, G.ops[s], isActive, isSet, hasErr, hasInput));
 
     const rowSeq   = G.seqs[s + 1];
-    const rowLabel = s === G.depth - 1 ? '結果' : `中間${s + 1}`;
+    // 💡 最下段のラベルに「目標: ｎ (1..10)」を明記
+    const rowLabel = s === G.depth - 1 ? 'ゴール\n(ｎにする)' : `中間${s + 1}`;
     const rowClass = rowSeq ? 'fade-in' : 'dim-row';
-    const chipClass = rowSeq ? 'nat' : 'unknown';
+    const chipClass = rowSeq ? (isBaseSeq(rowSeq) ? 'nat' : 'not-base-chip') : 'unknown';
     rows.push(htmlSeqRow(rowSeq, rowLabel, rowClass, chipClass));
   }
 
@@ -1040,7 +1049,7 @@ function htmlSeqRow(seq, label, extraClass, chipClass) {
 
   return `
 <div class="seq-row ${extraClass || ''}">
-  <div class="row-label">${label}</div>
+  <div class="row-label" style="white-space:pre-line">${label}</div>
   <div class="chips-wrap">
     <div class="chips">${chips}</div>
   </div>
@@ -1174,7 +1183,6 @@ function htmlKeyboard() {
 </div>`;
 }
 
-// 💡 URLの ?code= パラメータを自動読み込み
 window.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const codeParam = urlParams.get('code');
